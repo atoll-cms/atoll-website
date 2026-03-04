@@ -15,6 +15,12 @@ php bin/atoll serve 8080
 php scripts/export-static.php dist
 ```
 
+For subpath deployments (for example GitHub Pages project sites), set:
+
+```bash
+ATOLL_EXPORT_BASE_URL="https://atoll-cms.github.io/atoll-website" php scripts/export-static.php dist
+```
+
 ## Deployment
 
 GitHub Actions builds a local static `dist/` from the atoll runtime and deploys that artifact to GitHub Pages.

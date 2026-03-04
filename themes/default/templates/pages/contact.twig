@@ -1,0 +1,10 @@
+{% extends 'layouts/base.twig' %}
+
+{% block content %}
+  <section class="page-head">
+    <p class="kicker">Get started</p>
+    <h1>{{ page.title }}</h1>
+    <p class="hero-copy">{{ page.excerpt }}</p>
+  </section>
+  <article class="prose">{{ page.content|raw }}</article>
+{% endblock %}

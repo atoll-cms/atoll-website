@@ -1,0 +1,38 @@
+{% extends 'layouts/base.twig' %}
+
+{% block content %}
+  <section class="hero">
+    <div>
+      <p class="kicker">PHP-native CMS</p>
+      <h1>{{ page.title }}</h1>
+      <p class="hero-copy">{{ page.excerpt }}</p>
+      <div class="hero-actions">
+        <a class="button button-primary" href="https://github.com/atoll-cms/atoll-starter">Starter verwenden</a>
+        <a class="button" href="https://github.com/atoll-cms/atoll-docs">Dokumentation</a>
+      </div>
+    </div>
+    <aside class="hero-panel">
+      <p class="panel-label">CLI Einstieg</p>
+      <pre><code>composer install
+php bin/atoll serve 8080
+php bin/atoll core:check</code></pre>
+    </aside>
+  </section>
+
+  <article class="prose">{{ page.content|raw }}</article>
+
+  <section class="feature-grid">
+    <article class="feature">
+      <h2>Core + Starter Split</h2>
+      <p>Updatefaehiger Unterbau mit klaren Projekt-Overrides fuer Themes, Templates und Plugins.</p>
+    </article>
+    <article class="feature">
+      <h2>Zero JS by Default</h2>
+      <p>Nur notwendige Islands werden hydriert. Der Rest bleibt reines, schnelles HTML.</p>
+    </article>
+    <article class="feature">
+      <h2>Shared Hosting Ready</h2>
+      <p>PHP 8.2+, kein Node im Betrieb, sauber fuer Agentur- und Kundenprojekte.</p>
+    </article>
+  </section>
+{% endblock %}

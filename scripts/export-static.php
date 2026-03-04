@@ -6,12 +6,17 @@ declare(strict_types=1);
 $outDir = $argv[1] ?? 'dist';
 $host = '127.0.0.1';
 $port = 8099;
-$baseUrl = "http://{$host}:{$port}";
+$serverBaseUrl = "http://{$host}:{$port}";
+$deployBaseUrl = trim((string) getenv('ATOLL_EXPORT_BASE_URL'));
+$deployPrefix = extractDeployPrefix($deployBaseUrl);
 
 rrmdir($outDir);
 mkdir($outDir, 0775, true);
 
-$cmd = sprintf('php -S %s:%d -t . index.php', $host, $port);
+$cmdPrefix = $deployBaseUrl !== ''
+    ? 'ATOLL_BASE_URL=' . escapeshellarg($deployBaseUrl) . ' '
+    : '';
+$cmd = sprintf('%sphp -S %s:%d -t . index.php', $cmdPrefix, $host, $port);
 $descriptors = [
     0 => ['pipe', 'r'],
     1 => ['file', '/tmp/atoll-export.log', 'a'],
@@ -24,32 +29,32 @@ if (!is_resource($process)) {
 }
 
 try {
-    waitForServer($baseUrl . '/');
+    waitForServer($serverBaseUrl . '/');
 
-    $queue = ['/'];
+    $queue = [publicPathForLocal('/', $deployPrefix)];
     $seen = [];
 
     while ($queue !== []) {
-        $path = array_shift($queue);
-        $path = normalizePath($path);
+        $publicPath = normalizePath((string) array_shift($queue));
+        $localPath = toLocalPath($publicPath, $deployPrefix);
 
-        if ($path === '' || isset($seen[$path])) {
+        if ($publicPath === '' || isset($seen[$publicPath])) {
             continue;
         }
 
-        if (shouldSkipPath($path)) {
-            $seen[$path] = true;
+        if (shouldSkipPath($localPath)) {
+            $seen[$publicPath] = true;
             continue;
         }
 
-        $seen[$path] = true;
+        $seen[$publicPath] = true;
 
-        $response = fetch($baseUrl . $path);
+        $response = fetch($serverBaseUrl . $localPath);
         if ($response['status'] >= 400) {
             continue;
         }
 
-        saveResponse($outDir, $path, $response['body'], $response['content_type']);
+        saveResponse($outDir, $localPath, $response['body'], $response['content_type']);
 
         if (str_contains($response['content_type'], 'text/html')) {
             foreach (extractAssetAndLinkPaths($response['body']) as $next) {
@@ -59,7 +64,7 @@ try {
             }
         }
 
-        if ($path === '/sitemap.xml') {
+        if ($publicPath === publicPathForLocal('/sitemap.xml', $deployPrefix)) {
             foreach (extractSitemapPaths($response['body']) as $next) {
                 if (!isset($seen[$next])) {
                     $queue[] = $next;
@@ -67,8 +72,11 @@ try {
             }
         }
 
-        if ($path === '/') {
-            foreach (['/sitemap.xml', '/robots.txt'] as $fixed) {
+        if ($publicPath === publicPathForLocal('/', $deployPrefix)) {
+            foreach ([
+                publicPathForLocal('/sitemap.xml', $deployPrefix),
+                publicPathForLocal('/robots.txt', $deployPrefix),
+            ] as $fixed) {
                 if (!isset($seen[$fixed])) {
                     $queue[] = $fixed;
                 }
@@ -141,6 +149,54 @@ function normalizePath(string $path): string
 
     $path = parse_url($path, PHP_URL_PATH) ?: '/';
     return '/' . ltrim($path, '/');
+}
+
+function extractDeployPrefix(string $baseUrl): string
+{
+    if ($baseUrl === '') {
+        return '';
+    }
+
+    $path = parse_url($baseUrl, PHP_URL_PATH);
+    if (!is_string($path)) {
+        return '';
+    }
+
+    $trimmed = trim($path, '/');
+    return $trimmed === '' ? '' : '/' . $trimmed;
+}
+
+function publicPathForLocal(string $localPath, string $deployPrefix): string
+{
+    $localPath = normalizePath($localPath);
+    if ($deployPrefix === '') {
+        return $localPath;
+    }
+
+    if ($localPath === '/') {
+        return $deployPrefix . '/';
+    }
+
+    return $deployPrefix . $localPath;
+}
+
+function toLocalPath(string $publicPath, string $deployPrefix): string
+{
+    $publicPath = normalizePath($publicPath);
+    if ($deployPrefix === '') {
+        return $publicPath;
+    }
+
+    if ($publicPath === $deployPrefix || $publicPath === $deployPrefix . '/') {
+        return '/';
+    }
+
+    if (str_starts_with($publicPath, $deployPrefix . '/')) {
+        $stripped = substr($publicPath, strlen($deployPrefix));
+        return $stripped === '' ? '/' : $stripped;
+    }
+
+    return $publicPath;
 }
 
 function shouldSkipPath(string $path): bool

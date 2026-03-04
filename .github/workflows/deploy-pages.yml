@@ -35,6 +35,8 @@ jobs:
 
       - name: Build static website locally with atoll
         run: php scripts/export-static.php dist
+        env:
+          ATOLL_EXPORT_BASE_URL: https://atoll-cms.github.io/atoll-website
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
