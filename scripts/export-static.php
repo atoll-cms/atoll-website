@@ -110,7 +110,7 @@ function fetch(string $url): array
     $body = @file_get_contents($url, false, $context);
     $headers = function_exists('http_get_last_response_headers')
         ? http_get_last_response_headers()
-        : ($GLOBALS['http_response_header'] ?? []);
+        : ($http_response_header ?? []);
 
     $status = 0;
     $contentType = 'application/octet-stream';
