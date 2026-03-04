@@ -6,7 +6,7 @@ Public website for atoll-cms, built with atoll itself.
 
 ```bash
 composer install
-php bin/atoll serve 8080
+php bin/atoll dev 8080
 ```
 
 ## Static export
