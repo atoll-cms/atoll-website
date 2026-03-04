@@ -9,3 +9,10 @@ atoll-cms verbindet die Developer Experience von Flat-File-CMS mit der Performan
 - Zero JS by default
 - Selektive Hydration fuer interaktive Komponenten
 - Core/Starter/Docs sauber getrennt
+
+## Live Benchmarks
+
+Aktuelle Vergleichswerte (atoll, atoll-static, WordPress, Kirby, Grav) sind oeffentlich einsehbar:
+
+- Dashboard: https://atoll-cms.github.io/atoll-benchmarks/
+- JSON API: https://atoll-cms.github.io/atoll-benchmarks/latest.json

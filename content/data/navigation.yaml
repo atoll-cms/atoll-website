@@ -6,3 +6,5 @@
   url: https://github.com/atoll-cms/atoll-starter
 - label: Docs
   url: https://github.com/atoll-cms/atoll-docs
+- label: Benchmarks
+  url: https://atoll-cms.github.io/atoll-benchmarks/
