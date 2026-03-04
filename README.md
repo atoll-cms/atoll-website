@@ -9,6 +9,8 @@ composer install
 php bin/atoll dev 8080
 ```
 
+`php bin/atoll serve 8080` fuehrt vor dem Start einen Einmal-Build moeglicher Frontend-Bundles aus.
+
 ## Static export
 
 ```bash
