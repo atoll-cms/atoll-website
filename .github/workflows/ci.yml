@@ -13,8 +13,19 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: HTML sanity checks
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: mbstring, json, gd, openssl, zip
+
+      - name: Install dependencies
+        run: composer install --no-interaction --prefer-dist
+
+      - name: Build static website locally with atoll
+        run: php scripts/export-static.php dist
+
+      - name: Verify output
         run: |
-          test -f index.html
-          grep -qi '<!doctype html>' index.html
-          grep -qi '<title>' index.html
+          test -f dist/index.html
+          test -f dist/sitemap.xml
