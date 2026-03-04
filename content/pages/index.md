@@ -14,5 +14,5 @@ atoll-cms verbindet die Developer Experience von Flat-File-CMS mit der Performan
 
 Aktuelle Vergleichswerte (atoll, atoll-static, WordPress, Kirby, Grav) sind oeffentlich einsehbar:
 
-- Dashboard: https://atoll-cms.github.io/atoll-benchmarks/
-- JSON API: https://atoll-cms.github.io/atoll-benchmarks/latest.json
+- [Benchmark Dashboard](https://atoll-cms.github.io/atoll-benchmarks/)
+- [Latest JSON Snapshot](https://atoll-cms.github.io/atoll-benchmarks/latest.json)
