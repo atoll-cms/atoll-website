@@ -1,10 +1,15 @@
 {% extends 'layouts/base.twig' %}
 
 {% block content %}
-  <section class="page-head">
-    <p class="kicker">Get started</p>
-    <h1>{{ page.title }}</h1>
-    <p class="hero-copy">{{ page.excerpt }}</p>
-  </section>
-  <article class="prose">{{ page.content|raw }}</article>
+  <div class="container">
+    <section class="page-head">
+      {% if page.eyebrow is defined %}<p class="page-kicker">{{ page.eyebrow }}</p>{% endif %}
+      <h1>{{ page.title }}</h1>
+      {% if page.excerpt %}<p class="lead">{{ page.excerpt }}</p>{% endif %}
+    </section>
+
+    <div class="page-content">
+      <article class="prose">{{ page.content|raw }}</article>
+    </div>
+  </div>
 {% endblock %}

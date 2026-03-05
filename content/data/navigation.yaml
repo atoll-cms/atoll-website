@@ -1,9 +1,7 @@
-- label: Start
-  url: /
-- label: Warum atoll?
+- label: Features
+  url: /features
+- label: Why atoll?
   url: /about
-- label: Starter
-  url: https://github.com/atoll-cms/atoll-starter
 - label: Docs
   url: https://github.com/atoll-cms/atoll-docs
 - label: Benchmarks

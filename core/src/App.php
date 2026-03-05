@@ -243,9 +243,19 @@ final class App
 
     private function minifyHtml(string $html): string
     {
+        // Preserve <pre>, <script>, <style> content from whitespace collapse
+        $protected = [];
+        $html = preg_replace_callback('/<(pre|script|style)\b[^>]*>.*?<\/\1>/si', static function ($m) use (&$protected) {
+            $key = '<!--ATOLL_KEEP_' . count($protected) . '-->';
+            $protected[$key] = $m[0];
+            return $key;
+        }, $html) ?? $html;
+
         $html = preg_replace('/>\s+</', '><', $html) ?? $html;
         $html = preg_replace('/\s{2,}/', ' ', $html) ?? $html;
-        return trim($html);
+        $html = trim($html);
+
+        return strtr($html, $protected);
     }
 
     private function normalizeCorePath(string $path): string

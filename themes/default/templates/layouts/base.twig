@@ -6,15 +6,56 @@
     {{ page ? seo_meta(page) : '' }}
     {{ hook('head:meta', page, site)|raw }}
     {{ hook('head:scripts', page, site)|raw }}
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="{{ theme_asset('main.css') }}">
   </head>
-  <body class="site-body">
+  <body>
     {{ hook('body:start', page, site)|raw }}
     {% include 'components/header.twig' %}
-    <main class="container site-main">
+
+    <main class="site-main">
       {% block content %}{% endblock %}
     </main>
+
     {% include 'components/footer.twig' %}
     {{ hook('body:end', page, site)|raw }}
+
+    <script>
+      /* ── Mobile nav toggle ── */
+      (function() {
+        const toggle = document.querySelector('.menu-toggle');
+        const nav = document.querySelector('.header-nav');
+        if (!toggle || !nav) return;
+
+        toggle.addEventListener('click', () => {
+          const open = nav.classList.toggle('is-open');
+          toggle.setAttribute('aria-expanded', String(open));
+        });
+
+        document.addEventListener('keydown', (e) => {
+          if (e.key === 'Escape' && nav.classList.contains('is-open')) {
+            nav.classList.remove('is-open');
+            toggle.setAttribute('aria-expanded', 'false');
+            toggle.focus();
+          }
+        });
+      })();
+
+      /* ── Scroll reveal ── */
+      (function() {
+        const els = document.querySelectorAll('.reveal');
+        if (!els.length) return;
+        const obs = new IntersectionObserver((entries) => {
+          entries.forEach(e => {
+            if (e.isIntersecting) {
+              e.target.classList.add('is-visible');
+              obs.unobserve(e.target);
+            }
+          });
+        }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+        els.forEach(el => obs.observe(el));
+      })();
+    </script>
   </body>
 </html>
