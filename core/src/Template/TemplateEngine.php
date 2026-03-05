@@ -15,6 +15,8 @@ final class TemplateEngine
 {
     private ?Environment $twig = null;
     private string $basePath = '';
+    /** @var (callable(): string)|null */
+    private $csrfTokenProvider;
 
     /** @param array<string, mixed> $config */
     public function __construct(
@@ -26,8 +28,10 @@ final class TemplateEngine
         private readonly IslandManager $islands,
         private readonly HookManager $hooks,
         private readonly SeoManager $seo,
-        private readonly array $config
+        private readonly array $config,
+        ?callable $csrfTokenProvider = null
     ) {
+        $this->csrfTokenProvider = $csrfTokenProvider;
         $this->basePath = $this->extractBasePath((string) ($this->config['base_url'] ?? ''));
 
         if (class_exists(Environment::class) && class_exists(FilesystemLoader::class)) {
@@ -46,6 +50,7 @@ final class TemplateEngine
             $this->twig->addFunction(new TwigFunction('asset', fn (string $path) => $this->resolveUrl($path)));
             $this->twig->addFunction(new TwigFunction('base_path', fn () => $this->basePath === '' ? '/' : $this->basePath));
             $this->twig->addFunction(new TwigFunction('now', fn () => date('c')));
+            $this->twig->addFunction(new TwigFunction('csrf_token', fn () => $this->resolveCsrfToken()));
 
             $this->twig->addGlobal('site', $this->config);
         }
@@ -94,12 +99,22 @@ final class TemplateEngine
             return $this->resolveUrl('/themes/' . rawurlencode($this->activeTheme) . '/assets/' . $relative);
         }
 
-        $coreThemePath = $this->coreRoot . '/themes/default/assets/' . $relative;
+        $coreThemePath = $this->coreRoot . '/themes/' . $this->activeTheme . '/assets/' . $relative;
         if (is_file($coreThemePath)) {
-            return $this->resolveUrl('/core/themes/default/assets/' . $relative);
+            return $this->resolveUrl('/core/themes/' . rawurlencode($this->activeTheme) . '/assets/' . $relative);
         }
 
         return $this->resolveUrl('/core/themes/default/assets/' . $relative);
+    }
+
+    private function resolveCsrfToken(): string
+    {
+        if (!is_callable($this->csrfTokenProvider)) {
+            return '';
+        }
+
+        $token = ($this->csrfTokenProvider)();
+        return is_string($token) ? $token : '';
     }
 
     private function resolveUrl(string $path): string

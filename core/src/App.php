@@ -12,6 +12,7 @@ use Atoll\Form\FormManager;
 use Atoll\Hooks\HookManager;
 use Atoll\Http\Request;
 use Atoll\Http\Response;
+use Atoll\Installer\InstallerController;
 use Atoll\Islands\IslandManager;
 use Atoll\Mail\Mailer;
 use Atoll\Media\MediaManager;
@@ -38,10 +39,7 @@ final class App
             $this->config['base_url'] = trim($envBaseUrl);
         }
 
-        $configuredCorePath = Config::get($this->config, 'core.path');
-        $this->coreRoot = is_string($configuredCorePath) && $configuredCorePath !== ''
-            ? $this->normalizeCorePath($configuredCorePath)
-            : $this->root . '/core';
+        $this->coreRoot = $this->resolveCoreRoot(Config::get($this->config, 'core.path'));
 
         $timezone = Config::get($this->config, 'timezone');
         if (is_string($timezone) && $timezone !== '') {
@@ -52,6 +50,20 @@ final class App
     public function handle(): Response
     {
         $request = Request::fromGlobals();
+        $security = new SecurityManager($this->root . '/cache/rate-limit', $this->config);
+        $installer = new InstallerController($this->root, $this->root . '/config.yaml');
+
+        if (!$this->isConfigured()) {
+            if (str_starts_with($request->path, '/install')) {
+                return $security->applyHeaders($installer->handle($request, false));
+            }
+
+            return $security->applyHeaders(Response::redirect('/install', 302));
+        }
+
+        if (str_starts_with($request->path, '/install')) {
+            return $security->applyHeaders($installer->handle($request, true));
+        }
 
         $hooks = new HookManager();
         $pluginManager = new PluginManager(
@@ -62,14 +74,20 @@ final class App
         );
         $pluginManager->load();
 
+        $environment = strtolower((string) Config::get($this->config, 'environment', 'prod'));
+        $cacheEnabled = (bool) Config::get($this->config, 'cache.enabled', true);
+        $cacheEnabledInDev = (bool) Config::get($this->config, 'cache.dev_enabled', false);
+        if ($environment === 'dev' && !$cacheEnabledInDev) {
+            $cacheEnabled = false;
+        }
+
         $cache = new CacheManager(
             cacheDir: $this->root . '/cache',
-            enabled: (bool) Config::get($this->config, 'cache.enabled', true),
+            enabled: $cacheEnabled,
             hooks: $hooks,
             ttl: (int) Config::get($this->config, 'cache.ttl', 3600)
         );
 
-        $security = new SecurityManager($this->root . '/cache/rate-limit', $this->config);
         $forceHttps = $security->forceHttps($request);
         if ($forceHttps !== null) {
             return $security->applyHeaders($forceHttps);
@@ -80,16 +98,29 @@ final class App
             return $security->applyHeaders($rateLimited);
         }
 
-        $content = new ContentRepository($this->root . '/content', $hooks);
+        $content = new ContentRepository(
+            contentRoot: $this->root . '/content',
+            hooks: $hooks,
+            config: $this->config,
+            siteRoot: $this->root
+        );
         $redirects = new RedirectManager($this->root . '/content/data/redirects.yaml');
         $mailer = new Mailer($this->config);
-        $forms = new FormManager($this->root . '/content/forms', $this->root . '/content/forms-submissions', $mailer, $security);
+        $forms = new FormManager(
+            $this->root . '/content/forms',
+            $this->root . '/content/forms-submissions',
+            $mailer,
+            $security,
+            $hooks,
+            $this->config
+        );
         $seo = new SeoManager($this->config);
 
         $activeTheme = (string) Config::get($this->config, 'appearance.theme', 'default');
         $templateRoots = array_values(array_filter([
             $this->root . '/templates',
             $this->root . '/themes/' . $activeTheme . '/templates',
+            $this->coreRoot . '/themes/' . $activeTheme . '/templates',
             $this->coreRoot . '/themes/default/templates',
         ], static fn (string $path) => is_dir($path)));
 
@@ -111,11 +142,12 @@ final class App
             islands: $islands,
             hooks: $hooks,
             seo: $seo,
-            config: $this->config
+            config: $this->config,
+            csrfTokenProvider: fn (): string => $security->csrfToken()
         );
 
         $media = new MediaManager($this->root . '/assets/uploads', $hooks);
-        $backup = new BackupManager($this->root . '/content', $this->root . '/backups');
+        $backup = new BackupManager($this->root . '/content', $this->root . '/backups', $this->config);
 
         $admin = new AdminController(
             root: $this->root,
@@ -125,6 +157,7 @@ final class App
                 $this->root . '/admin',
                 $this->coreRoot . '/admin',
             ],
+            hooks: $hooks,
             security: $security,
             content: $content,
             cache: $cache,
@@ -132,6 +165,18 @@ final class App
             backup: $backup,
             media: $media
         );
+
+        if (str_starts_with($request->path, '/admin') && !$security->isAdminIpAllowed($request)) {
+            $security->recordAudit('admin.access_denied_ip', [
+                'ip' => $request->server['REMOTE_ADDR'] ?? 'unknown',
+            ]);
+
+            if (str_starts_with($request->path, '/admin/api')) {
+                return $security->applyHeaders(Response::json(['error' => 'Admin access from this IP is not allowed'], 403));
+            }
+
+            return $security->applyHeaders(Response::html('<h1>403 Forbidden</h1><p>Admin access from this IP is not allowed.</p>', 403));
+        }
 
         if (str_starts_with($request->path, '/admin/api')) {
             return $security->applyHeaders($admin->handleApi($request));
@@ -218,7 +263,6 @@ final class App
             'collection' => $resolved['collection'] ?? null,
             'items' => $resolved['items'] ?? [],
             'navigation' => $content->readDataFile('navigation.yaml'),
-            'csrf_token' => $security->csrfToken(),
         ];
 
         $hooks->run('page:before_render', $payload, $request);
@@ -243,28 +287,33 @@ final class App
 
     private function minifyHtml(string $html): string
     {
-        // Preserve <pre>, <script>, <style> content from whitespace collapse
-        $protected = [];
-        $html = preg_replace_callback('/<(pre|script|style)\b[^>]*>.*?<\/\1>/si', static function ($m) use (&$protected) {
-            $key = '<!--ATOLL_KEEP_' . count($protected) . '-->';
-            $protected[$key] = $m[0];
-            return $key;
-        }, $html) ?? $html;
-
         $html = preg_replace('/>\s+</', '><', $html) ?? $html;
         $html = preg_replace('/\s{2,}/', ' ', $html) ?? $html;
-        $html = trim($html);
-
-        return strtr($html, $protected);
+        return trim($html);
     }
 
     private function normalizeCorePath(string $path): string
     {
-        if (str_starts_with($path, '/')) {
-            return rtrim($path, '/');
+        if (str_starts_with($path, '/') || preg_match('/^[A-Za-z]:[\\\\\\/]/', $path) === 1) {
+            return rtrim(str_replace('\\', '/', $path), '/');
         }
 
         return rtrim($this->root . '/' . ltrim($path, '/'), '/');
+    }
+
+    private function resolveCoreRoot(mixed $configuredCorePath): string
+    {
+        $bundled = rtrim($this->root . '/core', '/');
+        if (!is_string($configuredCorePath) || trim($configuredCorePath) === '') {
+            return $bundled;
+        }
+
+        $candidate = $this->normalizeCorePath(trim($configuredCorePath));
+        if (is_file($candidate . '/src/bootstrap.php')) {
+            return $candidate;
+        }
+
+        return $bundled;
     }
 
     private function basePath(): string
@@ -277,5 +326,28 @@ final class App
 
         $trimmed = trim($path, '/');
         return $trimmed === '' ? '' : '/' . $trimmed;
+    }
+
+    private function isConfigured(): bool
+    {
+        if (!is_file($this->root . '/config.yaml')) {
+            return false;
+        }
+
+        $users = Config::get($this->config, 'users', []);
+        if (!is_array($users) || $users === []) {
+            return false;
+        }
+
+        foreach ($users as $user) {
+            if (!is_array($user)) {
+                continue;
+            }
+            if (is_string($user['username'] ?? null) && is_string($user['password_hash'] ?? null) && $user['password_hash'] !== '') {
+                return true;
+            }
+        }
+
+        return false;
     }
 }
