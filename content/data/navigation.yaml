@@ -3,6 +3,8 @@
 - label: Why atoll?
   url: /about
 - label: Docs
-  url: https://github.com/atoll-cms/atoll-docs
+  url: https://atoll-cms.github.io/atoll-docs
+- label: Live Demo
+  url: https://atoll-cms.github.io/atoll-starter
 - label: Benchmarks
   url: https://atoll-cms.github.io/atoll-benchmarks/

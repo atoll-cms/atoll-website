@@ -16,7 +16,7 @@ Besides individual pages (`content/pages/`), any number of collections can be de
 Structured data like navigation, configuration or product lists can be stored as YAML files in `content/data/` and used directly in templates.
 
 ### Admin Panel
-The built-in admin panel runs as a single-page application on Vue.js — no additional installation, no extra cost. CRUD for pages, media upload, live preview.
+The built-in admin panel runs as a single-page application on Svelte — no additional installation, no extra cost. CRUD for pages, media upload, live preview.
 
 ## Rendering & Performance
 
