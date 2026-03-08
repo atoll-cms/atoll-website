@@ -7,6 +7,7 @@
   let updaterChannel = $state('stable');
   let updaterManifestUrl = $state('');
   let selectedTheme = $state('default');
+  let appearanceVarsText = $state('');
   let smtpDriver = $state('mail');
   let smtpHost = $state('localhost');
   let smtpPort = $state('587');
@@ -52,6 +53,7 @@
     updaterChannel = $settings?.updater?.channel || 'stable';
     updaterManifestUrl = $settings?.updater?.manifest_url || '';
     selectedTheme = $settings?.appearance?.theme || 'default';
+    appearanceVarsText = formatCssVariables($settings?.appearance?.custom_variables || {});
     smtpDriver = $settings?.smtp?.driver || 'mail';
     smtpHost = $settings?.smtp?.host || 'localhost';
     smtpPort = String($settings?.smtp?.port || '587');
@@ -110,7 +112,8 @@
             },
             appearance: {
               ...($settings.appearance || {}),
-              theme: selectedTheme
+              theme: selectedTheme,
+              custom_variables: parseCssVariables(appearanceVarsText)
             },
             smtp: {
               ...($settings.smtp || {}),
@@ -225,6 +228,31 @@
       addToast(err.message, 'error');
     }
   }
+
+  function parseCssVariables(source) {
+    const rows = {};
+    const lines = String(source || '').split('\n');
+    for (const rawLine of lines) {
+      const line = rawLine.trim();
+      if (!line || line.startsWith('#')) continue;
+      const cleaned = line.endsWith(';') ? line.slice(0, -1).trim() : line;
+      const sep = cleaned.indexOf(':');
+      if (sep <= 2) continue;
+      const key = cleaned.slice(0, sep).trim();
+      const value = cleaned.slice(sep + 1).trim();
+      if (!/^--[a-zA-Z0-9_-]+$/.test(key) || !value) continue;
+      rows[key] = value;
+    }
+    return rows;
+  }
+
+  function formatCssVariables(variables) {
+    if (!variables || typeof variables !== 'object') return '';
+    return Object.entries(variables)
+      .filter(([key, value]) => /^--[a-zA-Z0-9_-]+$/.test(String(key)) && String(value || '').trim() !== '')
+      .map(([key, value]) => `${key}: ${String(value).trim()};`)
+      .join('\n');
+  }
 </script>
 
 <div class="settings-view">
@@ -262,6 +290,17 @@
             <option value={t.id}>{t.id}</option>
           {/each}
         </select>
+      </div>
+
+      <div class="field">
+        <label for="appearance-vars">Appearance CSS Variablen</label>
+        <textarea
+          id="appearance-vars"
+          rows="6"
+          bind:value={appearanceVarsText}
+          placeholder="--brand: #0ea5e9;&#10;--radius-lg: 16px;">
+        </textarea>
+        <p class="field-note">Eine Zeile pro Variable im Format <code>--name: wert;</code>. Wird als <code>:root</code>-Override injiziert.</p>
       </div>
 
       <div class="fieldset">
@@ -529,7 +568,8 @@
   }
 
   .field input,
-  .field select {
+  .field select,
+  .field textarea {
     width: 100%;
     padding: 0.6rem 0.75rem;
     background: var(--bg);
@@ -542,9 +582,18 @@
   }
 
   .field input:focus,
-  .field select:focus {
+  .field select:focus,
+  .field textarea:focus {
     outline: none;
     border-color: var(--brand);
+  }
+
+  .field textarea {
+    resize: vertical;
+    min-height: 6.5rem;
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 0.8rem;
+    line-height: 1.5;
   }
 
   .field-row {
